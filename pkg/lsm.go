@@ -1,4 +1,4 @@
-package docker
+package lsm
 
 import (
 	"encoding/json"
@@ -13,10 +13,6 @@ import (
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins"
 	"github.com/falcosecurity/plugin-sdk-go/pkg/sdk/plugins/source"
-
-	//dockerTypes "github.com/docker/docker/api/types"
-	dockerEvents "github.com/docker/docker/api/types/events"
-	//docker "github.com/moby/docker/client"
 )
 
 var (
@@ -38,8 +34,6 @@ type Plugin struct {
 	Config                 PluginConfig
 	lastLsmEventMessage    LsmMessage 
 	lastLsmEventNum	       uint64		
-	lastDockerEventMessage dockerEvents.Message
-	lastDockerEventNum     uint64
 }
 
 type LsmMessage struct {
@@ -167,12 +161,12 @@ func close_fn() {
 // Open is called by Falco plugin framework for opening a stream of events, we call that an instance
 func (Plugin *Plugin) Open(params string) (source.Instance, error) {
 	eventC := make(chan source.PushEvent)
-	// launch an async worker that listens for Docker events and pushes them
+	// launch an async worker that listens for lsm events and pushes them
 	// to the event channel
 	go func() {
 		defer close(eventC)
 		
-		cmd := exec.Command("./lsm-rs");
+		cmd := exec.Command("/usr/bin/lsm-rs");
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			fmt.Println("Error launching lsm-rs:", err)
@@ -183,43 +177,15 @@ func (Plugin *Plugin) Open(params string) (source.Instance, error) {
 		defer cmd.Wait();
 
 		reader := bufio.NewReader(stdout)
-		//eventC <- source.PushEvent(Data: bytes)
 		for {
 			eventjson, err := reader.ReadString('\n')
 			if err != nil {
 				return
 			}
 
-			//fmt.Println(eventjson)
 			b := []byte(eventjson)
 			eventC <- source.PushEvent{Data: b}
 		}
-
-		/*
-		msgC, errC := dclient.Events(ctx, dockerTypes.EventsOptions{})
-		var msg dockerEvents.Message
-		var err error
-		for {
-			select {
-			case msg = <-msgC:
-				bytes, err := json.Marshal(msg)
-				if err != nil {
-					eventC <- source.PushEvent{Err: err}
-					// errors are blocking, so we can stop here
-					return
-				}
-				eventC <- source.PushEvent{Data: bytes}
-			case err = <-errC:
-				if err == io.EOF {
-					// map EOF to sdk.ErrEOF, which is recognized by the Go SDK
-					err = sdk.ErrEOF
-				}
-				eventC <- source.PushEvent{Err: err}
-				// errors are blocking, so we can stop here
-				return
-			}
-		}
-		*/
 	}()
 	return source.NewPushInstance(eventC, source.WithInstanceClose(close_fn))
 }
