@@ -1,6 +1,7 @@
 - rule: A program is executed
-  condition: lsm.etype in (0,1,2,3)
-  output: exec path=%lsm.file.path uid=%lsm.user.uid gid=%lsm.user.gid
+  condition: lsm.etype in (exec)
+  desc: A program is executed
+  output: "[lsm] exec path=%lsm.file.path uid=%lsm.user.uid gid=%lsm.user.gid"
   priority: INFO
   source: lsm
   tags: [lsm]
